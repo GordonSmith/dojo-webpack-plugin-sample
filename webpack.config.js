@@ -20,7 +20,7 @@ var webpack = require("webpack");
 
 module.exports = {
 	context: __dirname,
-	entry: "js/bootstrap",
+	entry: "lib/bootstrap",
 	output: {
 		path: path.join(__dirname, "release"),
 		publicPath: "release/",
@@ -29,25 +29,37 @@ module.exports = {
 	},
 	module: {
 		loaders: [
-			{ test: /\.(png)|(gif)$/, loader: "url-loader?limit=100000" }
-		]
+			{
+				test: /\.(png)|(gif)$/, loader: "url-loader?limit=100000"
+			}, {
+				test: /\.css$/,
+				use: ['style-loader', 'css-loader']
+			}, {
+				test: /.(ttf|otf|eot|svg|woff(2)?)(\?[a-z0-9]+)?$/,
+				use: [{
+					loader: 'file-loader',
+					options: {
+						name: './build/[name].[ext]'
+					}
+				}]
+			}]
 	},
 	plugins: [
 		new DojoWebpackPlugin({
-			loaderConfig: require("./js/loaderConfig")("node_modules"),
+			loaderConfig: require("./src/loaderConfig")("node_modules"),
 			locales: ["en"]
 		}),
 		// For plugins registered after the DojoAMDPlugin, data.request has been normalized and
 		// resolved to an absMid and loader-config maps and aliases have been applied
 		new webpack.NormalModuleReplacementPlugin(/^dojox\/gfx\/renderer!/, "dojox/gfx/canvas"),
 		new webpack.NormalModuleReplacementPlugin(
-			/^css!/, function(data) {
+			/^css!/, function (data) {
 				data.request = data.request.replace(/^css!/, "!style-loader!css-loader!less-loader!")
 			}
 		),
 		new webpack.optimize.UglifyJsPlugin({
-			output: {comments: false},
-			compress: {warnings: false},
+			output: { comments: false },
+			compress: { warnings: false },
 			sourceMap: true
 		})
 	],
