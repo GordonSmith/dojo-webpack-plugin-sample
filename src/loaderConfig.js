@@ -13,27 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-function getConfig(dojoRoot) {
-	// dojoRoot is defined if we're running in node (i.e. building)
-	if (dojoRoot) {
-		var path = require('path');
-	}
+function getConfig(env) {
+	// env is set by the 'buildEnvronment' and/or 'environment' plugin options (see webpack.config.js),
+	// or by the code at the end of this file if using without webpack
 	dojoConfig = {
 		baseUrl: ".",
 		packages: [
 			{
 				name: 'dojo',
-				location: dojoRoot ? path.join(dojoRoot, "./dojo").replace("\\", "/") : './node_modules/dojo',
+				location: env.dojoRoot + '/dojo',
 				lib: '.'
 			},
 			{
 				name: 'dijit',
-				location: dojoRoot ? path.join(dojoRoot, "./dijit").replace("\\", "/") : './node_modules/dijit',
+				location: env.dojoRoot + '/dijit',
 				lib: '.'
 			},
 			{
 				name: 'dojox',
-				location: dojoRoot ? path.join(dojoRoot, "./dojox").replace("\\", "/") : './node_modules/dojox',
+				location: env.dojoRoot + '/dojox',
 				lib: '.'
 			}
 		],
@@ -53,11 +51,23 @@ function getConfig(dojoRoot) {
 			lesspp: "loader/less.min"
 		},
 
-		blankGif: "./blank.gif",
-
 		deps: ["lib/bootstrap"],
 
-		async: true
+		async: true,
+
+		has: {'dojo-config-api': 0},	// Don't need the config API code in the embedded Dojo loader
+
+		fixupUrl: function(url) {
+			// Load the uncompressed versions of dojo/dijit/dojox javascript files when using the dojo loader.
+			// When using a webpack build, the dojo loader is not used for loading javascript files so this
+			// property has no effect.  This is only needed because we're loading Dojo from a CDN for this
+			// demo.  In a normal development envorinment, Dojo would be installed locally and this wouldn't
+			// be needed.
+			if (/\/(dojo|dijit|dojox)\/.*\.js$/.test(url)) {
+			  url += ".uncompressed.js";
+		  }
+			return url;
+		}
 	};
 	return dojoConfig;
 }
@@ -66,5 +76,6 @@ function getConfig(dojoRoot) {
 if (typeof module !== 'undefined' && module) {
 	module.exports = getConfig;
 } else {
-	getConfig();
+	// No webpack.  This script was loaded by page via script tag, so load Dojo from CDN
+	getConfig({dojoRoot: '//ajax.googleapis.com/ajax/libs/dojo/1.13.0'});
 }
