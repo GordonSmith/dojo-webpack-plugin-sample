@@ -1,89 +1,103 @@
-/*
- * (C) Copyright IBM Corp. 2012, 2016 All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *	 http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+var HasJsPlugin = require('webpack-hasjs-plugin');
 var DojoWebpackPlugin = require("dojo-webpack-plugin");
 var CopyWebpackPlugin = require("copy-webpack-plugin");
-var UglifyJsPlugin = require("uglifyjs-webpack-plugin");
+const TerserPlugin = require('terser-webpack-plugin');
 
 var path = require("path");
 var webpack = require("webpack");
 
-module.exports = {
-	context: __dirname,
-	entry: "lib/bootstrap",
-	output: {
-		path: path.join(__dirname, "release"),
-		publicPath: "release/",
-		pathinfo: true,
-		filename: "bundle.js"
-	},
-	module: {
-		rules: [{
-	    test: /\.(png)|(gif)$/,
-	    use: [
-	      {
-	        loader: 'url-loader',
-	        options: {
-	          limit: 100000
-	        }
-	      }
-	    ]
-	  }]		
-	},
-	plugins: [
-		new DojoWebpackPlugin({
-			loaderConfig: require("./src/loaderConfig"),
-			environment: {dojoRoot: "release"},	// used at run time for non-packed resources (e.g. blank.gif)
-			buildEnvironment: {dojoRoot: "node_modules"}, // used at build time
-			locales: ["en"]
-		}),
+module.exports = function (env) {
+    const isProduction = !env || env.build !== "dev";
 
-		// Copy non-packed resources needed by the app to the release directory
-		new CopyWebpackPlugin([{
-			context: "node_modules",
-			from: "dojo/resources/blank.gif",
-			to: "dojo/resources"
-		}]),
-
-		// For plugins registered after the DojoAMDPlugin, data.request has been normalized and
-		// resolved to an absMid and loader-config maps and aliases have been applied
-		new webpack.NormalModuleReplacementPlugin(/^dojox\/gfx\/renderer!/, "dojox/gfx/canvas"),
-		new webpack.NormalModuleReplacementPlugin(
-			/^css!/, function(data) {
-				data.request = data.request.replace(/^css!/, "!style-loader!css-loader!less-loader!")
-			}
-		)
-	],
-	resolveLoader: {
-		modules: ["node_modules"]
-	},
-	mode: "production",
-	optimization: {
-    minimizer: [
-      // we specify a custom UglifyJsPlugin here to get source maps in production
-      new UglifyJsPlugin({
-        cache: true,
-        parallel: true,
-        uglifyOptions: {
-          compress: true,
-          mangle: true,
-					output: {comments:false}
+    return {
+        context: __dirname,
+        entry: {
+            "index": "./lib-cjs/index",
+            "index.min": "./lib-cjs/index",
         },
-        sourceMap: true
-      })
-    ]
-  },
-	devtool: "#source-map"
-};
+        output: {
+            path: path.join(__dirname, "dist"),
+            publicPath: "dist/",
+            libraryTarget: "umd",
+            library: "@hpcc-js/dgrid-shim",
+            pathinfo: true,
+            filename: "[name].js"
+        },
+        module: {
+            rules: [
+                {
+                    test: /\.(png|jpg|gif)$/,
+                    use: [
+                        {
+                            loader: 'url-loader',
+                            options: {
+                                limit: 100000
+                            }
+                        }
+                    ]
+                }, {
+                    test: /\.css$/,
+                    use: ['style-loader', 'css-loader']
+                }, {
+                    test: /.(ttf|otf|eot|svg|woff(2)?)(\?[a-z0-9]+)?$/,
+                    use: [{
+                        loader: 'file-loader',
+                        options: {
+                            name: './dist/[name].[ext]'
+                        }
+                    }]
+                }]
+        },
+        plugins: [
+            new HasJsPlugin({
+                features: {
+                    "touch": false,
+                    'dojo-config-api': false,
+                    "dojo-trace-api": false,
+                    "dojo-log-api": false,
+                    'dojo-publish-privates': false,
+                    'dojo-sync-loader': false,
+                    'dojo-test-sniff': false,
+                    'dijit-legacy-requires': false,
+                    "dojo-loader": false,
+                    "bug-for-in-skips-shadowed": false,
+                    "dojo-debug-messages": false,
+                    "highcontrast": false
+                }
+            }),
+            new DojoWebpackPlugin({
+                loaderConfig: require("./src/loaderConfig"),
+                environment: { dojoRoot: "./dist" },	// used at run time for non-packed resources (e.g. blank.gif)
+                buildEnvironment: { dojoRoot: "./node_modules" }, // used at build time
+                locales: ["en"]
+            }),
+            new DojoWebpackPlugin.ScopedRequirePlugin(),
+            // For plugins registered after the DojoAMDPlugin, data.request has been normalized and
+            // resolved to an absMid and loader-config maps and aliases have been applied
+            new webpack.NormalModuleReplacementPlugin(/^dojox\/gfx\/renderer!/, "dojox/gfx/canvas"),
+            new webpack.NormalModuleReplacementPlugin(
+                /^css!/, function (data) {
+                    data.request = data.request.replace(/^css!/, "!style-loader!css-loader!")
+                }
+            ),
+            new webpack.NormalModuleReplacementPlugin(
+                /^xstyle\/css!/, function (data) {
+                    data.request = data.request.replace(/^xstyle\/css!/, "!style-loader!css-loader!")
+                }
+            )
+        ],
+        resolveLoader: {
+            modules: ["./node_modules"]
+        },
+        mode: isProduction ? "production" : "development",
+        optimization: {
+            minimizer: [
+                // we specify a custom UglifyJsPlugin here to get source maps in production
+                new TerserPlugin({
+                    test: /\.min\.js$/
+                })
+            ]
+        },
+        devtool: false
+    };
+}

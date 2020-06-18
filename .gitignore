@@ -1,3 +1,4 @@
-/release/
+/dist/
 /node_modules/
-/lib/
+/lib*/
+*.tsbuildinfo
